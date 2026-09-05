@@ -1,0 +1,164 @@
+{
+  "personal": {
+    "full_name": "Shubham Kulkarni",
+    "first_name": "Shubham",
+    "last_name": "Kulkarni",
+    "email": "skulkarni3795@gmail.com",
+    "phone": "+91 87888 65001",
+    "phone_digits": "8788865001",
+    "country_code": "+91",
+    "city": "Pune",
+    "state": "Maharashtra",
+    "country": "India",
+    "linkedin_url": "https://linkedin.com/in/shubham-kulkarni-2b1707114",
+    "current_location": "Pune, India"
+  },
+  "professional": {
+    "current_title": "Senior Automation Engineer",
+    "target_roles": [
+      "Senior SDET",
+      "SDET",
+      "Senior QA Automation Engineer",
+      "Senior Automation Engineer",
+      "Senior Quality Engineer",
+      "Software Engineer in Test",
+      "QA Automation Engineer",
+      "Test Automation Engineer",
+      "Automation Test Lead"
+    ],
+    "total_experience_years": 9,
+    "summary": "Senior Automation Engineer with around 9 years of experience building and scaling test automation for mission-critical products across public safety, banking, healthcare, and automotive. Deep hands-on expertise in Playwright, Selenium, and C#, with strong ownership of CI/CD delivery on Azure DevOps and Azure Pipelines."
+  },
+  "skills": {
+    "core_languages": ["C#", ".NET", "Core Java", "SQL"],
+    "test_automation": [
+      "Playwright",
+      "Selenium WebDriver",
+      "C#",
+      "NUnit",
+      "Reqnroll",
+      "SpecFlow",
+      "Page Object Model (POM)",
+      "Parallel Execution",
+      "Cross-Browser Testing"
+    ],
+    "api_and_virtualization": ["WireMock", "REST API Testing", "RestSharp", "Postman"],
+    "devops_and_ci_cd": [
+      "Azure DevOps",
+      "Azure Pipelines",
+      "CI/CD",
+      "Git",
+      "Docker",
+      "Build & Release Automation",
+      "Allure Reporting"
+    ],
+    "ai_engineering": [
+      "GitHub Copilot",
+      "AI-Driven Test Automation",
+      "Multi-Agent Workflows",
+      "Human-in-the-Loop Validation"
+    ],
+    "methodologies": ["BDD", "Agile / Scrum", "Test Strategy", "Risk-Based Testing", "QA & QC"],
+    "domains": [
+      "Public Safety (911 / Emergency Response)",
+      "Banking (HSBC & Virgin Money)",
+      "Healthcare (AODocs & ServiceNow)",
+      "Autonomous Vehicles (ADAS / NVIDIA)"
+    ]
+  },
+  "skill_years": {
+    "c#": 9,
+    ".net": 9,
+    "playwright": 4,
+    "selenium": 8,
+    "bdd": 7,
+    "specflow": 6,
+    "reqnroll": 3,
+    "azure devops": 6,
+    "azure pipelines": 5,
+    "ci/cd": 6,
+    "rest api testing": 7,
+    "restsharp": 6,
+    "postman": 7,
+    "wiremock": 4,
+    "nunit": 8,
+    "docker": 3,
+    "allure reporting": 4,
+    "java": 4,
+    "sql": 6
+  },
+  "experience": [
+    {
+      "company": "NICE Ltd",
+      "title": "Senior Automation Engineer",
+      "location": "Pune, India",
+      "start_date": "Apr 2022",
+      "end_date": "Present",
+      "domain": "Public safety – 911 & emergency-response products",
+      "highlights": [
+        "Contributed to and helped scale a modular Playwright and C# automation framework covering 1,000+ critical tests.",
+        "Built parallel test execution into Azure Pipelines, cutting build-verification time by 30% and tightening CI/CD feedback loop.",
+        "Collaborated daily with UK-based counterparts in cross-functional team of ~20 shaping test strategy.",
+        "Mentored 2-4 junior engineers on C#, POM design, and Playwright practices."
+      ]
+    },
+    {
+      "company": "Capita",
+      "title": "Software Consultant",
+      "location": "Pune, India",
+      "start_date": "Jan 2021",
+      "end_date": "Apr 2022",
+      "domain": "Banking – HSBC & Virgin Money",
+      "highlights": [
+        "Led quality-engineering for HSBC and Virgin Money within a 10-member team.",
+        "Built maintainable Selenium WebDriver and C# suites running across IaaS VM and PaaS App Service.",
+        "Owned CI setup in Azure DevOps, keeping builds fast and deployments verified with zero downtime.",
+        "Authored test plans and BDD specifications (SpecFlow, C#) with UK-based stakeholders."
+      ]
+    },
+    {
+      "company": "Eteva",
+      "title": "Test Automation Engineer",
+      "location": "Pune, India",
+      "start_date": "Jul 2019",
+      "end_date": "Dec 2020",
+      "domain": "Healthcare – AODocs & ServiceNow",
+      "highlights": [
+        "Reviewed system architecture and turned complex business requirements into focused test cases.",
+        "Wrote BDD test suites with Selenium WebDriver, C#, and SpecFlow.",
+        "Managed Azure DevOps day to day (Boards, Git repos, CI pipeline configuration)."
+      ]
+    },
+    {
+      "company": "Spectrum (NVIDIA)",
+      "title": "Process Executive – Automation & Data Validation",
+      "location": "Pune, India",
+      "start_date": "Dec 2017",
+      "end_date": "Jun 2019",
+      "domain": "Autonomous vehicles (ADAS)",
+      "highlights": [
+        "Ran data-factory and ADAS validation using Hatch-based data ingestion and image-analysis pipelines.",
+        "Set up QA and QC processes to keep autonomous-driving datasets accurate.",
+        "Built custom test utilities for tricky edge cases."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Engineering, Electronics & Telecommunication",
+      "institution": "Pune University",
+      "year": 2017
+    }
+  ],
+  "certifications": [
+    "Microsoft Certified: Azure Fundamentals (AZ-900), 2021",
+    "ISTQB Certified Tester – Foundation Level (CTFL), 2021",
+    "ISTQB Certified Tester – Agile Tester Extension, 2023"
+  ],
+  "legal_and_work_auth": {
+    "authorized_in_india": true,
+    "require_sponsorship": false,
+    "gender": "Male",
+    "disability": "No"
+  }
+}

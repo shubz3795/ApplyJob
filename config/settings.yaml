@@ -1,0 +1,78 @@
+# User Configuration for Job Search and Apply Automation
+
+application:
+  mode: "hybrid" # hybrid (auto easy apply + queue external ATS) | easy_apply_only
+  review_mode: true # true: pause before final submit for confirmation; false: auto-submit
+  resume_path: "Shubham_Kulkarni_Resume.pdf"
+
+safety_guards:
+  strict_no_posts: true # NEVER create posts, status updates, or articles
+  strict_no_profile_edits: true # NEVER modify profile, headline, or details
+  strict_no_messaging: true # NEVER send messages or InMails
+  strict_no_social_actions: true # NEVER like, react, or comment on posts
+  auto_uncheck_follow_company: true # Always uncheck 'Follow company' on Easy Apply
+  allowed_actions_only:
+    - "search_jobs"
+    - "read_job_descriptions"
+    - "submit_job_application"
+
+screening_defaults:
+  notice_period_days: 30
+  notice_period_text: "30 Days"
+  current_ctc_lpa: 27.0 # 27 LPA Verified
+  expected_ctc_lpa: 35.0 # Target 32-35 LPA Verified
+  expected_min_ctc_lpa: 32.0
+  willing_to_relocate: true
+  open_to_hybrid: true
+  open_to_remote: true
+
+search_filters:
+  freshness_hours: 24 # Strict: Only last 24 hours
+  preferred_locations:
+    - "Remote"
+    - "Pune"
+    - "Hyderabad"
+    - "Bengaluru"
+    - "Bangalore"
+    - "Mumbai"
+    - "Chennai"
+    - "Hybrid"
+    - "India"
+  min_ctc_lpa: 32.0 # Target 32-35 LPA+
+
+search_queries:
+  linkedin:
+    - "Senior SDET C#"
+    - "Senior SDET Playwright"
+    - "Senior QA Automation C#"
+    - "Senior Automation Engineer C#"
+    - "SDET C# Selenium"
+    - "SDET C# Playwright"
+    - "QA Automation Engineer C#"
+    - "Senior Test Automation Engineer"
+    - "Software Engineer in Test C#"
+    - "Senior QA Engineer Automation"
+    - "SDET Azure DevOps"
+    - "Senior SDET Banking"
+    - "SDET Fintech"
+  naukri:
+    - "Senior SDET"
+    - "SDET"
+    - "Senior QA Automation Engineer"
+    - "Senior Automation Engineer"
+    - "QA Automation C#"
+    - "SDET C#"
+    - "SDET Playwright"
+    - "SDET Selenium"
+    - "Senior Test Automation Engineer"
+    - "Software Engineer in Test"
+    - "QA Automation Engineer"
+    - "Automation Test Lead"
+
+scoring_weights:
+  technical_skills: 0.30
+  seniority_experience: 0.20
+  job_freshness: 0.15
+  role_company_quality: 0.15
+  compensation: 0.10
+  location: 0.10
