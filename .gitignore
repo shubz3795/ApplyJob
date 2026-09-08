@@ -1,7 +1,47 @@
+# Python & Virtual Environments
 .venv/
+venv/
+ENV/
 __pycache__/
-*.pyc
-user_data/
-*.log
+*.py[cod]
+*$py.class
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Binaries & Build Artifacts
+bin/
+obj/
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+
+# Debug & Temporary Files
+*debug*
+debug/
+*.png
+*.jpg
+*.jpeg
+*.log
+
+# Databases & Local State
+*.db
+*.sqlite
+*.sqlite3
 job_tracker.db
+
+# Browser Automation & Session Data
+user_data/
+
+# Local Runtime Data & Execution Reports
+data/
+reports/
+
+# Operating System & IDE
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.idea/
+.vscode/

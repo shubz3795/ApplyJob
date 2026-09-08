@@ -40,13 +40,19 @@ class LinkedInApplier:
             page.wait_for_timeout(2500)
 
             # Check if already applied
-            if page.query_selector("span:has-text('Applied'), button:has-text('Applied')"):
+            body_text = page.inner_text("body").lower()
+            if (
+                "application submitted" in body_text 
+                or "you applied on" in body_text 
+                or page.query_selector("span:has-text('Applied'), button:has-text('Applied'), div:has-text('Application submitted')")
+            ):
                 logger.info(f"Already applied to {title} at {company}")
                 return True, "Already applied"
 
             # Find Easy Apply button
             apply_btn = self._find_easy_apply_button(page)
             if not apply_btn:
+                logger.info(f"Skipping {title} at {company}: Not an Easy Apply job (requires external ATS redirect)")
                 return False, "Not an Easy Apply job (requires external ATS redirect)"
 
             apply_btn.click()
@@ -123,16 +129,27 @@ class LinkedInApplier:
             "button.jobs-apply-button:has-text('Easy Apply')",
             "div.jobs-apply-button--top-card button:has-text('Easy Apply')",
             "button[aria-label*='Easy Apply']",
-            "button:has-text('Easy Apply')"
+            "button:has-text('Easy Apply')",
+            "div.jobs-s-apply button:has-text('Easy Apply')",
+            "a[href*='/apply/']:has-text('Easy Apply')",
+            "a[href*='openSDUIApplyFlow']:has-text('Easy Apply')",
+            "a[data-view-name='job-apply-button']:has-text('Easy Apply')",
+            ".jobs-apply-button:has-text('Easy Apply')"
         ]
         for sel in selectors:
-            btn = page.query_selector(sel)
-            if btn and btn.is_visible():
-                return btn
+            for btn in page.query_selector_all(sel):
+                if btn and btn.is_visible():
+                    # Ensure it is not a recommendation card to another job search / similar jobs
+                    href = btn.get_attribute("href") or ""
+                    if "search-results" in href or "similar_jobs" in href or "trackingId=" in href and "/apply/" not in href:
+                        continue
+                    btn.scroll_into_view_if_needed()
+                    return btn
         return None
 
     def _find_next_button(self, page: Page):
         selectors = [
+            "button[data-easy-apply-next-button]",
             "button[aria-label='Continue to next step']",
             "button:has-text('Next')",
             "footer button:has-text('Next')"
@@ -147,7 +164,8 @@ class LinkedInApplier:
         selectors = [
             "button[aria-label='Submit application']",
             "button:has-text('Submit application')",
-            "footer button:has-text('Submit application')"
+            "footer button:has-text('Submit application')",
+            "button:has-text('Submit')"
         ]
         for sel in selectors:
             btn = page.query_selector(sel)
@@ -164,43 +182,121 @@ class LinkedInApplier:
         return any(bool(page.query_selector(ind)) for ind in indicators)
 
     def _fill_step_inputs(self, page: Page):
-        modal = page.query_selector("div.jobs-easy-apply-modal")
+        modal = page.query_selector("div.jobs-easy-apply-modal, [role='dialog'], .artdeco-modal")
         if not modal:
             return
 
-        # 1. Resume File Upload
+        # 1. Resume Selection & File Upload
+        # Check for pre-uploaded resume radio cards (jobsDocumentCardToggle)
+        resume_radios = modal.query_selector_all("input[type='radio'][id*='jobsDocumentCardToggle'], input[type='radio'][name*='jobsDocumentCardToggle']")
+        if resume_radios:
+            # Find the best matching resume card (e.g. matching Shubham_Kulkarni_Resume.pdf or Shubham)
+            preferred_radio = None
+            preferred_lbl = None
+            preferred_text = ""
+
+            for r in resume_radios:
+                r_id = r.get_attribute("id") or ""
+                lbl = modal.query_selector(f"label[for='{r_id}']")
+                txt = lbl.inner_text().strip().lower() if lbl else ""
+                # Prioritize Shubham_Kulkarni_Resume.pdf or Shubham / SDET
+                if "shubham_kulkarni_resume" in txt or "shubham" in txt or "sdet" in txt:
+                    preferred_radio = r
+                    preferred_lbl = lbl
+                    preferred_text = lbl.inner_text().strip() if lbl else "Shubham Resume"
+                    break
+
+            if preferred_radio:
+                if not preferred_radio.is_checked():
+                    if preferred_lbl:
+                        preferred_lbl.click()
+                    else:
+                        preferred_radio.click()
+                    logger.info(f"Selected preferred resume card: '{preferred_text}'")
+                    page.wait_for_timeout(500)
+            elif not any(r.is_checked() for r in resume_radios) and len(resume_radios) > 0:
+                first_r = resume_radios[0]
+                r_id = first_r.get_attribute("id") or ""
+                lbl = modal.query_selector(f"label[for='{r_id}']")
+                lbl_text = lbl.inner_text().strip() if lbl else "First available resume"
+                if lbl:
+                    lbl.click()
+                else:
+                    first_r.click()
+                logger.info(f"Selected default resume card: '{lbl_text}'")
+                page.wait_for_timeout(500)
+
         file_input = modal.query_selector("input[type='file']")
         if file_input and self.resume_path.exists():
             try:
                 # Check if resume is already attached
                 uploaded = modal.query_selector(".jobs-document-upload__file-name, div[aria-label*='Resume']")
-                if not uploaded:
+                if not uploaded and not resume_radios:
                     file_input.set_input_files(str(self.resume_path))
+                    logger.info(f"Uploaded local resume file: {self.resume_path.name}")
                     page.wait_for_timeout(1500)
             except Exception as e:
                 logger.debug(f"Resume upload: {e}")
 
-        # 2. Text and Numeric Inputs
-        inputs = modal.query_selector_all("input[type='text'], input[type='number']")
+        # 2. Text, Numeric Inputs, and Textareas
+        # First check for optional "Include a message to hiring team" or "Add a note" button and expand if present
+        try:
+            msg_btn = modal.query_selector(
+                "button:has-text('Include a message'), button:has-text('Add a note'), button:has-text('Add message'), button[aria-label*='Include a message'], button[aria-label*='Add a note']"
+            )
+            if msg_btn and msg_btn.is_visible():
+                msg_btn.click()
+                page.wait_for_timeout(400)
+        except Exception:
+            pass
+
+        inputs = modal.query_selector_all("input[type='text'], input[type='number'], textarea")
         for inp in inputs:
             try:
                 if not inp.is_visible():
                     continue
+                tag_name = inp.evaluate("el => el.tagName.toLowerCase()")
                 inp_id = inp.get_attribute("id") or ""
                 label_text = self._get_label_for_input(page, inp, inp_id)
                 curr_val = inp.input_value().strip()
 
-                if not curr_val and label_text:
-                    ans, reason = self.screener.answer_question(label_text, field_type="text")
-                    if ans is not None:
-                        inp.fill(ans)
-                        logger.debug(f"Filled '{label_text}' with '{ans}' ({reason})")
-                    else:
-                        user_ans = self.screener.prompt_user_for_answer(label_text)
-                        if user_ans:
-                            inp.fill(user_ans)
-            except Exception:
-                pass
+                if not curr_val:
+                    # Check maxlength constraint
+                    maxlength_attr = inp.get_attribute("maxlength")
+                    max_len = int(maxlength_attr) if maxlength_attr and maxlength_attr.isdigit() else None
+
+                    # Dedicated textarea handling: LinkedIn "Include message" / "Why good fit" / cover letter
+                    if tag_name == "textarea":
+                        query_prompt = label_text if label_text else "describe in short why it good fit for you include message"
+                        ans, reason = self.screener.answer_question(query_prompt, field_type="textarea", max_length=max_len)
+                        if not ans:
+                            ans = self.screener.get_standard_pitch(max_length=max_len)
+                        if ans:
+                            inp.fill(ans)
+                            logger.info(f"Filled Easy Apply textarea '{label_text or 'message'}' with verified pitch ({len(ans)} chars)")
+                            page.wait_for_timeout(300)
+                            continue
+
+                    if label_text:
+                        ans, reason = self.screener.answer_question(label_text, field_type="text", max_length=max_len)
+                        if ans is not None:
+                            inp.fill(ans)
+                            logger.debug(f"Filled '{label_text}' with '{ans}' ({reason})")
+                            page.wait_for_timeout(300)
+
+                            # If input triggered a typeahead/combobox dropdown (e.g. City/Location), click matching option
+                            typeahead_opt = page.query_selector(
+                                ".basic-typeahead__selectable-list li, div[role='listbox'] div[role='option'], .artdeco-typeahead__results-list li"
+                            )
+                            if typeahead_opt and typeahead_opt.is_visible():
+                                typeahead_opt.click()
+                                page.wait_for_timeout(300)
+                        else:
+                            user_ans = self.screener.prompt_user_for_answer(label_text)
+                            if user_ans:
+                                inp.fill(user_ans)
+            except Exception as e:
+                logger.debug(f"Error filling input: {e}")
 
         # 3. Radio Fieldsets
         fieldsets = modal.query_selector_all("fieldset")
@@ -242,20 +338,75 @@ class LinkedInApplier:
             except Exception:
                 pass
 
+        # 5. Checkboxes (e.g. Terms, Legal Acknowledgements, Work Eligibility)
+        checkboxes = modal.query_selector_all("input[type='checkbox']")
+        for cb in checkboxes:
+            try:
+                cb_id = cb.get_attribute("id") or ""
+                # Skip follow-company checkbox here (it is handled before final submit)
+                if "follow-company" in cb_id.lower():
+                    continue
+                if not cb.is_checked():
+                    cb_lbl = page.query_selector(f"label[for='{cb_id}']")
+                    if cb_lbl and cb_lbl.is_visible():
+                        cb_lbl.click()
+                    else:
+                        cb.check(force=True)
+            except Exception:
+                pass
+
     def _get_label_for_input(self, page: Page, elem, elem_id: str) -> str:
+        # 1. Direct label[for]
         if elem_id:
-            lbl = page.query_selector(f"label[for='{elem_id}']")
-            if lbl:
-                return lbl.inner_text().strip()
+            try:
+                lbl = page.query_selector(f"label[for='{elem_id}']")
+                if lbl and lbl.inner_text().strip():
+                    return lbl.inner_text().strip()
+            except Exception:
+                pass
+
+        # 2. aria-label
         aria = elem.get_attribute("aria-label")
-        if aria:
+        if aria and aria.strip():
             return aria.strip()
-        # Look for parent label
-        parent = elem.evaluate_handle("el => el.closest('.fb-form-element, .jobs-easy-apply-form-section')")
-        if parent:
-            plbl = parent.as_element().query_selector(".fb-form-element-label, label")
-            if plbl:
-                return plbl.inner_text().strip()
+
+        # 3. placeholder
+        placeholder = elem.get_attribute("placeholder")
+        if placeholder and placeholder.strip():
+            return placeholder.strip()
+
+        # 4. aria-describedby
+        describedby = elem.get_attribute("aria-describedby")
+        if describedby:
+            for desc_id in describedby.split():
+                try:
+                    desc_el = page.query_selector(f"#{desc_id}")
+                    if desc_el and desc_el.inner_text().strip():
+                        return desc_el.inner_text().strip()
+                except Exception:
+                    pass
+
+        # 5. Parent / container label & headings
+        try:
+            parent = elem.evaluate_handle(
+                "el => el.closest('.fb-form-element, .jobs-easy-apply-form-element, .jobs-easy-apply-form-section, .artdeco-text-input')"
+            )
+            if parent:
+                p_el = parent.as_element()
+                if p_el:
+                    plbl = p_el.query_selector(
+                        ".fb-form-element-label, label, .jobs-easy-apply-form-section__sub-title, .jobs-easy-apply-form-section__title, h3, h4"
+                    )
+                    if plbl and plbl.inner_text().strip():
+                        return plbl.inner_text().strip()
+        except Exception:
+            pass
+
+        # 6. name attribute
+        name_attr = elem.get_attribute("name")
+        if name_attr and name_attr.strip():
+            return name_attr.strip()
+
         return ""
 
     def _uncheck_follow_company(self, page: Page):
@@ -272,11 +423,17 @@ class LinkedInApplier:
 
     def _dismiss_modal(self, page: Page):
         try:
-            dismiss_btn = page.query_selector("button[aria-label='Dismiss']")
+            done_btn = page.query_selector("button:has-text('Done'), button:has-text('Close')")
+            if done_btn and done_btn.is_visible():
+                done_btn.click()
+                page.wait_for_timeout(800)
+                return
+
+            dismiss_btn = page.query_selector("button[aria-label='Dismiss'], button[data-test-modal-close-btn]")
             if dismiss_btn:
                 dismiss_btn.click()
                 page.wait_for_timeout(800)
-                discard_btn = page.query_selector("button:has-text('Discard')")
+                discard_btn = page.query_selector("button[data-control-name='discard_application_confirm_btn'], button:has-text('Discard')")
                 if discard_btn:
                     discard_btn.click()
         except Exception:

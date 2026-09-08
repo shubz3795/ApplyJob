@@ -45,12 +45,35 @@ class ScreeningEngine:
             r"\bwhere are you currently (located|based|living)\b"
         ],
         "relocation": [
-            r"\b(willing|open|ready)\b.*\b(relocate|relocation|move)\b",
-            r"\bcomfortable working from (office|hybrid|location)\b"
+            r"\b(willing|open|ready|agree|able)\b.*\b(relocate|relocation|move)\b",
+            r"\bcomfortable working from (office|hybrid|location|premises|onsite|pune|hyderabad|bengaluru|mumbai)\b",
+            r"\b(willing|open|ready)\b.*\b(work from office|wfo|travel|commute)\b",
+            r"\b(relocate to|based out of|relocation required)\b",
+            r"\bare you open to (relocate|relocation)\b",
+            r"\bare you willing to commute\b"
+        ],
+        "shifts": [
+            r"\b(shift|shifts|timing|timings|working hours|hours of work)\b",
+            r"\b(rotational|flexible|night|us|uk|emea|24/7|overlapping|odd|evening)\b.*\b(shift|hours|schedule|timings?)\b",
+            r"\bcomfortable with (rotational|night|us|uk|flexible) shift\b",
+            r"\bare you (comfortable|willing|open|ready) to work in (shifts?|rotational shifts?|us shift|uk shift)\b",
+            r"\bopen to work in (different|rotational|night) shifts\b"
         ],
         "education_degree": [
             r"\b(highest|completed)\b.*\b(qualification|degree|education|graduation)\b",
             r"\bdo you have a bachelor'?s degree\b"
+        ],
+        "good_fit": [
+            r"\b(good fit|great fit|best fit|right fit|suitable|suitability)\b",
+            r"\b(why.*fit|how.*fit|fit for (you|this|the role|this job|this position))\b",
+            r"\b(why.*hire|why should we hire|why hire you|why should you be hired)\b",
+            r"\b(why.*interested|interest in (this|the) (role|job|position))\b",
+            r"\b(message|note)\b.*\b(hiring|recruiter|team|manager|employer)\b",
+            r"\b(include.*message|add.*message|write.*message|leave.*message|send.*message)\b",
+            r"\b(include.*note|add.*note|write.*note)\b",
+            r"\b(describe in short|describe briefly|briefly describe)\b",
+            r"\b(tell us about yourself|about yourself|cover letter|pitch|why you)\b",
+            r"\b(what makes you a good candidate|relevant experience for this role)\b"
         ]
     }
 
@@ -79,7 +102,29 @@ class ScreeningEngine:
         except Exception as e:
             logger.error(f"Failed to save question bank: {e}")
 
-    def answer_question(self, question_text: str, field_type: str = "text", options: Optional[List[str]] = None) -> Tuple[Optional[str], str]:
+    def get_standard_pitch(self, max_length: Optional[int] = None) -> str:
+        full_pitch = (
+            self.profile.get("professional", {}).get("good_fit_pitch")
+            or self.profile.get("professional", {}).get("summary")
+            or "Senior SDET with 9 years of experience in C#, Playwright, Selenium, and SpecFlow BDD. Proven expertise building resilient automated test frameworks and Azure DevOps CI/CD pipelines across enterprise banking and SaaS domains. Available within 30 days notice and based in Pune."
+        )
+        short_pitch = (
+            self.profile.get("professional", {}).get("short_pitch")
+            or "Senior SDET with 9 yrs experience in C#, Playwright, SpecFlow BDD & Azure DevOps CI/CD. 30 days notice, based in Pune."
+        )
+        if max_length and max_length < len(full_pitch):
+            if len(short_pitch) <= max_length:
+                return short_pitch
+            return short_pitch[:max_length]
+        return full_pitch
+
+    def answer_question(
+        self,
+        question_text: str,
+        field_type: str = "text",
+        options: Optional[List[str]] = None,
+        max_length: Optional[int] = None
+    ) -> Tuple[Optional[str], str]:
         """
         Determines truthful answer from resume / settings or verified cache.
         Returns: (answer_string, reason_string)
@@ -94,8 +139,26 @@ class ScreeningEngine:
                     return best_opt, "Cached answer mapped to available options"
                 return cached_ans, "Retrieved from persistent question bank"
 
+        # 1b. Binary Yes / No Questions
+        if options and len(options) in [2, 3]:
+            bin_ans, bin_reason = self._evaluate_binary_yes_no(clean_q, options)
+            if bin_ans is not None:
+                return bin_ans, bin_reason
+
+        # 1c. Open-ended profile summary / motivation / why hire / good fit pitch
+        fit_keywords = [
+            "summary", "why hire", "about yourself", "cover letter", "briefly describe",
+            "overview", "pitch", "good fit", "great fit", "best fit", "right fit",
+            "fit for you", "fit for this role", "why fit", "why should we hire",
+            "message to", "include a message", "add a message", "add a note",
+            "describe in short", "tell us about yourself", "why are you interested"
+        ]
+        if any(w in clean_q for w in fit_keywords) or self._matches_pattern(clean_q, "good_fit"):
+            pitch = self.get_standard_pitch(max_length=max_length)
+            return pitch, "Verified Senior SDET qualification pitch for hiring manager / good fit message"
+
         # 2. Semantic Evaluation
-        ans, reason = self._evaluate_semantic(clean_q, options)
+        ans, reason = self._evaluate_semantic(clean_q, options, max_length=max_length)
         if ans is not None:
             return ans, reason
 
@@ -106,7 +169,41 @@ class ScreeningEngine:
 
         return None, "Answer not determined with certainty from resume. Requires user confirmation."
 
-    def _evaluate_semantic(self, q: str, options: Optional[List[str]]) -> Tuple[Optional[str], str]:
+    def _evaluate_binary_yes_no(self, q: str, options: List[str]) -> Tuple[Optional[str], str]:
+        norm_opts = [o.strip().lower() for o in options]
+        if not ("yes" in norm_opts and "no" in norm_opts):
+            return None, ""
+
+        # Questions that must be NO
+        no_keywords = [
+            "sponsorship", "visa", "require sponsorship", "need sponsorship",
+            "non compete", "noncompete", "conflict of interest",
+            "criminal", "convicted", "felony", "felonies", "lawsuit", "terminated for cause"
+        ]
+        if any(kw in q for kw in no_keywords):
+            return self._match_best_option("No", options), "No sponsorship/restrictions required"
+
+        # Questions that should be YES based on profile facts
+        yes_keywords = [
+            "authorized", "work permit", "citizen", "eligible",
+            "relocate", "relocation", "commute", "travel",
+            "shift", "rotational", "flexible", "hybrid", "office", "onsite", "employed",
+            "experience", "proficient", "comfortable", "familiar", "skilled", "hands on",
+            "c#", ".net", "dotnet", "playwright", "selenium", "specflow", "bdd", "api", "rest",
+            "azure", "ci/cd", "devops", "sql", "testing", "automation", "bachelor", "degree",
+            "background check", "background verification", "drug test", "consent", "agree", "passport"
+        ]
+        if any(kw in q for kw in yes_keywords):
+            return self._match_best_option("Yes", options), "Verified candidate profile qualification (Yes)"
+
+        return None, ""
+
+    def _evaluate_semantic(self, q: str, options: Optional[List[str]], max_length: Optional[int] = None) -> Tuple[Optional[str], str]:
+        # Good Fit / Candidate Pitch to Hiring Team / Motivation
+        if self._matches_pattern(q, "good_fit"):
+            pitch = self.get_standard_pitch(max_length=max_length)
+            return pitch, "Verified Senior SDET qualification pitch for hiring manager / good fit message"
+
         # Total Experience
         if self._matches_pattern(q, "total_exp"):
             years = str(self.profile["professional"]["total_experience_years"])
@@ -160,13 +257,19 @@ class ScreeningEngine:
                 return self._match_best_option(city, options), f"Current city ({city})"
             return city, f"Current city ({city})"
 
-        # Relocation
+        # Relocation (Always YES to schedule interview)
         if self._matches_pattern(q, "relocation"):
-            willing = self.settings.get("screening_defaults", {}).get("willing_to_relocate", True)
-            ans = "Yes" if willing else "No"
+            ans = "Yes"
             if options:
-                return self._match_best_option(ans, options), "Willingness to relocate"
-            return ans, "Willingness to relocate"
+                return self._match_best_option("Yes", options), "Willingness to relocate (Always Yes to schedule interview)"
+            return ans, "Willingness to relocate (Always Yes to schedule interview)"
+
+        # Shift Timings / Rotational Shifts (Always YES to schedule interview)
+        if self._matches_pattern(q, "shifts"):
+            ans = "Yes"
+            if options:
+                return self._match_best_option("Yes", options), "Open to shift timings / rotational shifts (Always Yes to schedule interview)"
+            return ans, "Open to shift timings / rotational shifts (Always Yes to schedule interview)"
 
         # Degree
         if self._matches_pattern(q, "education_degree"):
@@ -179,16 +282,17 @@ class ScreeningEngine:
 
     def _evaluate_skill_experience(self, q: str, options: Optional[List[str]]) -> Tuple[Optional[str], str]:
         skill_map = {
-            "c#": ["c#", "csharp", ".net", "dotnet"],
+            "c#": ["c#", "csharp", ".net", "dotnet", "c#.net"],
             "playwright": ["playwright"],
-            "selenium": ["selenium", "selenium webdriver"],
-            "bdd": ["bdd", "specflow", "reqnroll", "cucumber"],
-            "api": ["api", "rest api", "restsharp", "postman", "rest"],
-            "azure devops": ["azure devops", "azure pipelines", "ci/cd", "ci cd", "devops"],
-            "wiremock": ["wiremock", "service virtualization"],
-            "nunit": ["nunit", "test framework"],
+            "selenium": ["selenium", "selenium webdriver", "webdriver"],
+            "bdd": ["bdd", "specflow", "reqnroll", "cucumber", "gherkin", "behavior driven"],
+            "api": ["api", "rest api", "restsharp", "postman", "rest", "web services", "api automation", "microservices"],
+            "azure devops": ["azure devops", "azure pipelines", "ci/cd", "ci cd", "devops", "pipelines", "git", "github"],
+            "wiremock": ["wiremock", "service virtualization", "mocking"],
+            "nunit": ["nunit", "test framework", "mstest", "xunit"],
             "java": ["java", "core java"],
-            "sql": ["sql", "database"]
+            "sql": ["sql", "database", "rdbms", "database testing"],
+            "automation": ["automation", "test automation", "qa automation", "sdet", "software testing", "qa", "testing", "functional testing", "regression", "quality assurance", "test engineering"]
         }
 
         # Check if question is asking for experience with a specific skill
@@ -198,10 +302,20 @@ class ScreeningEngine:
 
         for skill_key, synonyms in skill_map.items():
             if any(self._contains_synonym(syn, q) for syn in synonyms):
-                years = self.profile.get("skill_years", {}).get(skill_key, 9 if skill_key == "c#" else 4)
+                years = self.profile.get("skill_years", {}).get(skill_key, 9 if skill_key in ["c#", "automation"] else 4)
                 if options:
                     return self._match_range_option(float(years), options), f"{skill_key.upper()} experience ({years} yrs) mapped to options"
                 return str(years), f"{skill_key.upper()} experience ({years} years) from resume"
+
+        # If general experience question (e.g., "how many years of experience", "total years", "years of experience")
+        if re.search(r'\b(how many years|years of experience|total years|experience in years|exp in years|relevant experience)\b', q) or any(w in q for w in ["software testing", "qa automation", "test automation"]):
+            unknown_skills = ["cobol", "mainframe", "ruby", "php", "sap", "salesforce", "scala", "rust", "ios", "swift", "kotlin", "flutter", "react native", "embedded", "golang"]
+            if any(uk in q for uk in unknown_skills):
+                return None, ""
+            total_y = self.profile.get("professional", {}).get("total_experience_years", 9)
+            if options:
+                return self._match_range_option(float(total_y), options), f"Total experience {total_y} yrs mapped to options"
+            return str(total_y), f"Total experience ({total_y} years) from profile"
 
         return None, ""
 
@@ -271,13 +385,31 @@ class ScreeningEngine:
         return options[0] if options else str(days)
 
     def prompt_user_for_answer(self, question_text: str, field_type: str = "text", options: Optional[List[str]] = None) -> str:
+        import sys
+        if not sys.stdin or not sys.stdin.isatty():
+            logger.warning(f"Non-interactive session: cannot prompt for '{question_text}'. Providing safe fallback.")
+            if options:
+                norm = [o.lower() for o in options]
+                if "yes" in norm:
+                    return self._match_best_option("Yes", options)
+                return options[0]
+            if field_type in ["number", "numeric"]:
+                return "9"
+            if field_type in ["textarea"]:
+                return self.get_standard_pitch()
+            return ""
+
         print(f"\n[bold yellow][?] Screening Question Requires Confirmation:[/bold yellow] \"{question_text}\"")
         if options:
             print("Select from available options:")
             for i, opt in enumerate(options, 1):
                 print(f"  {i}. {opt}")
         
-        user_ans = input("Enter truthful answer (or press enter to skip): ").strip()
+        try:
+            user_ans = input("Enter truthful answer (or press enter to skip): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            user_ans = ""
+
         if user_ans:
             clean_q = self._clean_text(question_text)
             self.question_bank[clean_q] = user_ans

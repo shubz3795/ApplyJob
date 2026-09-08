@@ -336,18 +336,18 @@ class JobMatcher:
         return 75.0, f"Salary: {salary_str}"
 
     def _eval_location(self, location_str: str, text: str) -> Tuple[float, str]:
-        loc = location_str.lower()
-        if any(p in loc for p in ["pune"]):
-            return 100.0, "Preferred city (Pune)"
+        loc = f"{location_str} {text}".lower()
+        if "pune" in loc:
+            return 100.0, "Top Priority: Pune"
         elif any(p in loc for p in ["remote", "work from home", "wfh"]):
-            return 100.0, "Preferred: Remote / WFH"
-        elif any(p in loc for p in ["hyderabad"]):
-            return 100.0, "Preferred city (Hyderabad)"
+            return 100.0, "Top Priority: Remote / WFH"
+        elif "hyderabad" in loc:
+            return 85.0, "Tier 2 Metro (Hyderabad)"
         elif any(p in loc for p in ["bengaluru", "bangalore", "mumbai", "chennai"]):
-            return 85.0, f"Secondary metro ({location_str})"
-        elif "hybrid" in loc or "hybrid" in text:
-            return 85.0, "Hybrid India"
+            return 75.0, f"Tier 3 Metro ({location_str})"
+        elif "hybrid" in loc:
+            return 75.0, "Hybrid India"
         elif "india" in loc:
-            return 80.0, "Pan-India"
+            return 70.0, "Pan-India"
         else:
-            return 50.0, f"Non-preferred location ({location_str})"
+            return 50.0, f"Other location ({location_str})"

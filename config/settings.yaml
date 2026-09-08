@@ -11,6 +11,8 @@ safety_guards:
   strict_no_messaging: true # NEVER send messages or InMails
   strict_no_social_actions: true # NEVER like, react, or comment on posts
   auto_uncheck_follow_company: true # Always uncheck 'Follow company' on Easy Apply
+  max_runtime_minutes: 30 # Precautionary timeout: max 30 minutes per agent run
+  daemon_interval_hours: 10.0 # Autonomous background run interval (every 10 hours)
   allowed_actions_only:
     - "search_jobs"
     - "read_job_descriptions"
@@ -22,15 +24,54 @@ screening_defaults:
   current_ctc_lpa: 27.0 # 27 LPA Verified
   expected_ctc_lpa: 35.0 # Target 32-35 LPA Verified
   expected_min_ctc_lpa: 32.0
-  willing_to_relocate: true
+  willing_to_relocate: true # Always YES to schedule interviews
   open_to_hybrid: true
   open_to_remote: true
+  willing_to_work_shifts: true # Rotational, US, UK, Night shifts: Always YES
+  comfortable_with_shifts: true
+  total_experience_years: 9
+
+application_limits:
+  daily_max_linkedin: 50 # Strict daily cap to prevent rate limits / account warnings
+  daily_max_naukri: 50   # Strict daily cap to prevent Naukri application quota exhaustion
+  batch_max_per_run: 50  # Max applications in a single run
 
 search_filters:
-  freshness_hours: 24 # Strict: Only last 24 hours
+  freshness_hours: 24 # Strict: Only last 24 hours (change to 48 for 2-day window)
+
+  # Platform-Specific Multi-Filter Controls (Matches UI filter pills)
+  linkedin:
+    easy_apply_only: true       # f_AL=true: Only fetch jobs with Easy Apply
+    under_10_applicants: false  # f_EA=true: Filter for 'Under 10 applicants' pill (Early Applicant)
+    experience_levels:          # f_E: 4=Mid-Senior, 5=Director (Senior SDET / Lead)
+      - "mid_senior"
+    job_types:                  # f_JT: F=Full-time
+      - "full_time"
+    workplace_types: []         # Optional: ["remote", "hybrid", "on_site"] (Empty = all)
+    sort_by_recent: true        # sortBy=DD: Strict chronological newest first
+
+  # Platform-Specific Multi-Filter Controls for Naukri
+  naukri:
+    post_date_days: 1           # postDate=1 (last 24 hours), 3 (last 3 days)
+    experience_years: 8         # experience=8
+    wfh_types: []               # Optional: ["remote", "hybrid", "office"] (Empty = all)
+
+  location_priority:
+    top: # Highest priority: sorted first & highest score
+      - "Pune"
+      - "Remote"
+      - "Work from home"
+      - "WFH"
+    tier2: # Secondary
+      - "Hyderabad"
+    tier3: # Tertiary Metros
+      - "Bengaluru"
+      - "Bangalore"
+      - "Mumbai"
+      - "Chennai"
   preferred_locations:
-    - "Remote"
     - "Pune"
+    - "Remote"
     - "Hyderabad"
     - "Bengaluru"
     - "Bangalore"
@@ -56,12 +97,12 @@ search_queries:
     - "Senior SDET Banking"
     - "SDET Fintech"
   naukri:
+    - "Senior SDET C#"
     - "Senior SDET"
-    - "SDET"
-    - "Senior QA Automation Engineer"
-    - "Senior Automation Engineer"
-    - "QA Automation C#"
+    - "Senior Automation Engineer C#"
     - "SDET C#"
+    - "SDET Specflow"
+    - "Senior QA Automation Engineer"
     - "SDET Playwright"
     - "SDET Selenium"
     - "Senior Test Automation Engineer"
@@ -76,3 +117,11 @@ scoring_weights:
   role_company_quality: 0.15
   compensation: 0.10
   location: 0.10
+
+telegram:
+  enabled: true # Set to true to send run summaries to your Telegram channel
+  bot_token: "8663758254:AAFr4z7-kBOMjEEdMExRp4FW-mPtIN5L4c4" # Telegram Bot API token from @BotFather
+  chat_id: "-1004325484171"   # Telegram channel Chat ID (JobApply)
+  channel_invite_link: "https://t.me/+cLQoQ9-VdvpmMzg1"
+  notify_on_run_complete: true
+  notify_only_if_applied: false

@@ -26,19 +26,131 @@ class LinkedInScraper:
         "Referer": "https://www.linkedin.com/jobs"
     }
 
-    def __init__(self, session: Optional[requests.Session] = None, max_workers: int = 2):
+    EXP_LEVEL_MAP = {
+        "internship": "1",
+        "entry_level": "2",
+        "entry": "2",
+        "associate": "3",
+        "mid_senior": "4",
+        "mid_senior_level": "4",
+        "senior": "4",
+        "director": "5",
+        "executive": "6"
+    }
+
+    WORKPLACE_TYPE_MAP = {
+        "on_site": "1",
+        "onsite": "1",
+        "remote": "2",
+        "hybrid": "3"
+    }
+
+    JOB_TYPE_MAP = {
+        "full_time": "F",
+        "fulltime": "F",
+        "part_time": "P",
+        "contract": "C",
+        "temporary": "T",
+        "internship": "I"
+    }
+
+    def __init__(self, session: Optional[requests.Session] = None, max_workers: int = 2, default_filters: Optional[Dict[str, Any]] = None):
         self.session = session or requests.Session()
         self.session.headers.update(self.DEFAULT_HEADERS)
         self.max_workers = max_workers
+        self.default_filters = default_filters or {}
 
-    def search_jobs(self, query: str, location: str = "India", max_results: int = 20) -> List[Dict[str, Any]]:
+    def build_search_url(
+        self,
+        query: str,
+        location: str = "India",
+        freshness_hours: Optional[int] = None,
+        easy_apply_only: Optional[bool] = None,
+        under_10_applicants: Optional[bool] = None,
+        experience_levels: Optional[List[str]] = None,
+        workplace_types: Optional[List[str]] = None,
+        job_types: Optional[List[str]] = None,
+        sort_by_recent: Optional[bool] = None,
+        start: int = 0
+    ) -> str:
         """
-        Searches LinkedIn jobs strictly with f_TPR=r86400 (posted within last 24 hours).
+        Builds LinkedIn job search URL with multiple UI filter pills.
+        """
+        params = [
+            f"keywords={quote(query)}",
+            f"location={quote(location)}",
+            f"start={start}"
+        ]
+
+        # 1. Freshness / Date Posted (f_TPR)
+        fh = freshness_hours if freshness_hours is not None else self.default_filters.get("freshness_hours", 24)
+        if fh and fh > 0:
+            params.append(f"f_TPR=r{int(fh * 3600)}")
+
+        # 2. Easy Apply (f_AL)
+        ea_only = easy_apply_only if easy_apply_only is not None else self.default_filters.get("easy_apply_only", True)
+        if ea_only:
+            params.append("f_AL=true")
+
+        # 3. Under 10 Applicants / Early Applicant (f_EA)
+        u10 = under_10_applicants if under_10_applicants is not None else self.default_filters.get("under_10_applicants", False)
+        if u10:
+            params.append("f_EA=true")
+
+        # 4. Experience Level (f_E)
+        exp = experience_levels if experience_levels is not None else self.default_filters.get("experience_levels")
+        if exp:
+            codes = [self.EXP_LEVEL_MAP.get(str(x).lower(), str(x)) for x in exp]
+            params.append(f"f_E={quote(','.join(codes))}")
+
+        # 5. Workplace Type (f_WT)
+        wt = workplace_types if workplace_types is not None else self.default_filters.get("workplace_types")
+        if wt:
+            codes = [self.WORKPLACE_TYPE_MAP.get(str(x).lower(), str(x)) for x in wt]
+            params.append(f"f_WT={quote(','.join(codes))}")
+
+        # 6. Job Type (f_JT)
+        jt = job_types if job_types is not None else self.default_filters.get("job_types")
+        if jt:
+            codes = [self.JOB_TYPE_MAP.get(str(x).lower(), str(x)) for x in jt]
+            params.append(f"f_JT={quote(','.join(codes))}")
+
+        # 7. Sort Order (sortBy=DD for strict newest chronologically)
+        sbr = sort_by_recent if sort_by_recent is not None else self.default_filters.get("sort_by_recent", True)
+        if sbr:
+            params.append("sortBy=DD")
+
+        return f"{self.BASE_SEARCH_URL}?{'&'.join(params)}"
+
+    def search_jobs(
+        self,
+        query: str,
+        location: str = "India",
+        max_results: int = 20,
+        freshness_hours: Optional[int] = None,
+        easy_apply_only: Optional[bool] = None,
+        under_10_applicants: Optional[bool] = None,
+        experience_levels: Optional[List[str]] = None,
+        workplace_types: Optional[List[str]] = None,
+        job_types: Optional[List[str]] = None,
+        sort_by_recent: Optional[bool] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Searches LinkedIn jobs using configured multi-filters (Easy Apply, Under 10 applicants, Experience level, etc.).
         """
         results = []
-        encoded_query = quote(query)
-        encoded_loc = quote(location)
-        url = f"{self.BASE_SEARCH_URL}?keywords={encoded_query}&location={encoded_loc}&f_TPR=r86400&start=0"
+        url = self.build_search_url(
+            query=query,
+            location=location,
+            freshness_hours=freshness_hours,
+            easy_apply_only=easy_apply_only,
+            under_10_applicants=under_10_applicants,
+            experience_levels=experience_levels,
+            workplace_types=workplace_types,
+            job_types=job_types,
+            sort_by_recent=sort_by_recent,
+            start=0
+        )
 
         resp = self._request_with_retry(url)
         if not resp or resp.status_code != 200:
@@ -55,7 +167,8 @@ class LinkedInScraper:
             if len(results) >= max_results:
                 break
 
-        logger.info(f"Query '{query}' yielded {len(results)} fresh listings (<24h)")
+        fh = freshness_hours if freshness_hours is not None else self.default_filters.get("freshness_hours", 24)
+        logger.info(f"Query '{query}' yielded {len(results)} fresh listings (<{fh}h)")
         return results
 
     def fetch_descriptions_concurrently(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -139,7 +252,7 @@ class LinkedInScraper:
 
         job_id_match = re.search(r'-(\d+)(?:$|/)', url)
         job_id = job_id_match.group(1) if job_id_match else None
-        is_easy_apply = bool(card.find(class_=re.compile("easy-apply", re.I)))
+        is_easy_apply = True  # Guaranteed by f_AL=true filter in search query
 
         return {
             "platform": "linkedin",

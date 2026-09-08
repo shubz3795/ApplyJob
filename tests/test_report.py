@@ -47,3 +47,47 @@ def test_report_generation():
     assert "APPLIED (DONE)" in md
     assert "EXCLUDED / SKIPPED" in md
     assert "Startup" in md
+
+def test_run_report_generation(tmp_path):
+    sample_jobs = [
+        {
+            "platform": "naukri",
+            "company": "RBS Lynk",
+            "title": "Senior SDET",
+            "location": "Pune",
+            "match_score": 85.2,
+            "status": "discovered",
+            "url": "https://naukri.com/123"
+        }
+    ]
+    gen = ReportGenerator(sample_jobs, {})
+    run_meta = {
+        "mode": "auto",
+        "runtime_minutes": 1.5,
+        "timeout_minutes": 30.0,
+        "timed_out": False,
+        "discovered": 1,
+        "li_today": 1,
+        "nk_today": 2
+    }
+    applied = [{
+        "time": "01:30 AM",
+        "platform": "naukri",
+        "company": "Apexon",
+        "title": "Senior SDET",
+        "location": "Pune",
+        "match_score": 75.2,
+        "outcome": "✅ Applied Successfully",
+        "url": "https://naukri.com/456"
+    }]
+    report_file = gen.save_run_report(run_meta, applied, base_dir=tmp_path)
+    assert report_file.exists()
+    content = report_file.read_text(encoding="utf-8")
+    assert "Apexon" in content
+    assert "Applied Successfully" in content
+    assert "Pune" in content
+
+    recent = gen.get_recent_runs(base_dir=tmp_path)
+    assert len(recent) == 1
+    assert recent[0]["applied_count"] == 1
+    assert recent[0]["mode"] == "auto"

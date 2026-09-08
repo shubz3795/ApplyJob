@@ -11,7 +11,9 @@ def get_logger(name: str = "ApplyJob") -> logging.Logger:
         return _LOGGER.getChild(name)
 
     base_dir = Path(__file__).resolve().parent.parent.parent
-    log_file = base_dir / "applyjob.log"
+    logs_dir = base_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file = logs_dir / "applyjob.log"
 
     logger = logging.getLogger("ApplyJob")
     logger.setLevel(logging.DEBUG)

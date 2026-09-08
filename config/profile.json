@@ -27,7 +27,9 @@
       "Automation Test Lead"
     ],
     "total_experience_years": 9,
-    "summary": "Senior Automation Engineer with around 9 years of experience building and scaling test automation for mission-critical products across public safety, banking, healthcare, and automotive. Deep hands-on expertise in Playwright, Selenium, and C#, with strong ownership of CI/CD delivery on Azure DevOps and Azure Pipelines."
+    "summary": "Senior Automation Engineer with around 9 years of experience building and scaling test automation for mission-critical products across public safety, banking, healthcare, and automotive. Deep hands-on expertise in Playwright, Selenium, and C#, with strong ownership of CI/CD delivery on Azure DevOps and Azure Pipelines.",
+    "good_fit_pitch": "Senior SDET with 9 years of experience in C#, Playwright, Selenium, and SpecFlow BDD. Proven expertise building resilient automated test frameworks and Azure DevOps CI/CD pipelines across enterprise banking and SaaS domains. Available within 30 days notice and based in Pune.",
+    "short_pitch": "Senior SDET with 9 yrs experience in C#, Playwright, SpecFlow BDD & Azure DevOps CI/CD. 30 days notice, based in Pune."
   },
   "skills": {
     "core_languages": ["C#", ".NET", "Core Java", "SQL"],

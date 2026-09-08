@@ -15,10 +15,63 @@ class NaukriScraper:
 
     BASE_SEARCH_URL = "https://www.naukri.com"
 
-    def __init__(self, browser_manager=None):
-        self.browser_manager = browser_manager
+    WFH_TYPE_MAP = {
+        "office": "0",
+        "work_from_office": "0",
+        "hybrid": "2",
+        "remote": "3",
+        "wfh": "3",
+        "work_from_home": "3"
+    }
 
-    def search_jobs(self, query: str, experience_years: int = 8, max_results: int = 20) -> List[Dict[str, Any]]:
+    def __init__(self, browser_manager=None, default_filters: Optional[Dict[str, Any]] = None):
+        self.browser_manager = browser_manager
+        self.default_filters = default_filters or {}
+
+    def build_search_url(
+        self,
+        query: str,
+        experience_years: Optional[int] = None,
+        post_date_days: Optional[int] = None,
+        wfh_types: Optional[List[str]] = None,
+        location: Optional[str] = None
+    ) -> str:
+        """
+        Builds Naukri search URL with experience, freshness, and workplace filters.
+        """
+        slug = re.sub(r'[^a-zA-Z0-9]', '-', query).strip('-').lower()
+        encoded_query = quote(query)
+        base = f"{self.BASE_SEARCH_URL}/{slug}-jobs"
+
+        exp = experience_years if experience_years is not None else self.default_filters.get("experience_years", 8)
+        p_days = post_date_days if post_date_days is not None else self.default_filters.get("post_date_days", 1)
+
+        params = [
+            f"k={encoded_query}",
+            f"experience={exp}",
+            f"postDate={p_days}"
+        ]
+
+        wfh = wfh_types if wfh_types is not None else self.default_filters.get("wfh_types")
+        if wfh:
+            codes = [self.WFH_TYPE_MAP.get(str(x).lower(), str(x)) for x in wfh if str(x).lower() in self.WFH_TYPE_MAP or str(x).isdigit()]
+            if codes:
+                params.append(f"wfhType={','.join(codes)}")
+
+        if location and location.lower() != "india":
+            params.append(f"l={quote(location)}")
+
+        return f"{base}?{'&'.join(params)}"
+
+    def search_jobs(
+        self,
+        query: str,
+        experience_years: Optional[int] = None,
+        max_results: int = 20,
+        post_date_days: Optional[int] = None,
+        wfh_types: Optional[List[str]] = None,
+        location: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         results = []
         if not self.browser_manager:
             from src.applier.browser_manager import BrowserManager
@@ -26,9 +79,13 @@ class NaukriScraper:
 
         page = self.browser_manager.new_page()
         try:
-            slug = re.sub(r'[^a-zA-Z0-9]', '-', query).strip('-').lower()
-            encoded_query = quote(query)
-            search_url = f"{self.BASE_SEARCH_URL}/{slug}-jobs?k={encoded_query}&experience={experience_years}&postDate=1"
+            search_url = self.build_search_url(
+                query=query,
+                experience_years=experience_years,
+                post_date_days=post_date_days,
+                wfh_types=wfh_types,
+                location=location
+            )
             
             logger.info(f"Navigating to Naukri search: '{query}' ({search_url})")
             page.goto(search_url, timeout=40000, wait_until="domcontentloaded")
